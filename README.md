@@ -1,22 +1,34 @@
-# RCA Agent — VS Code Ready
+# RCA Agent 
 
 This project converts the supplied single React component into a proper full-stack app:
 
 - `frontend/` — Vite + React UI
-- `backend/` — Express API that securely calls Anthropic
-- The Anthropic API key is **never exposed to the browser**
+- `backend/` — Express API that securely calls Google Gemini
+- The Gemini API key is **never exposed to the browser**
 - `/api/health` verifies the backend configuration
 - The diagnostic request uses structured JSON output validation
 - The follow-up chat uses the same backend agent
 
-The original UI/data model is preserved from the uploaded RCA agent. The main change is that the AI call now goes through the backend instead of calling Anthropic directly from the browser. The uploaded source itself currently calls the Anthropic Messages API from the React client, which is not appropriate for a real local app because the API credential would have to live client-side. fileciteturn0file0L180-L221
+The original UI/data model is preserved from the uploaded RCA agent. The main change is that the AI call now goes through the backend instead of calling the AI provider directly from the browser. Calling an AI API from the React client directly is not appropriate for a real local app because the API credential would have to live client-side.
+
+## Overview
+
+### The problem
+
+When a business metric moves unexpectedly — a region's sales decline sharply, returns spike, or a KPI drops — the underlying data usually exists somewhere, but finding *why* it happened is slow and manual. Someone has to dig through regional stats, compare them against historical baselines, and manually connect numbers to a plausible explanation before anyone can act. That process doesn't scale across many regions or metrics, and it delays the point at which operations, product, or marketing teams can actually respond.
+
+### The solution
+
+**RCA Agent** is a dashboard that automates the first pass of root cause analysis. It takes structured business statistics (currently a deterministic dummy dataset covering four regions, including a deliberately injected anomaly in the West region) and sends them to an AI model, which returns a ranked list of likely root causes along with recommended actions. Users can also ask natural-language follow-up questions — like *"Why did West decline so sharply?"* — and get grounded answers back from the same backend agent, without needing to write their own queries or dig through raw numbers themselves.
+
+Architecturally, the AI call is kept entirely on the backend (Express) rather than the browser, so the API key is never exposed to the client and the response shape is validated before it reaches the UI — meaning a malformed AI response can't silently break the dashboard.
 
 ## 1. Requirements
 
 Install:
 
 - Node.js 20+ recommended
-- An Anthropic API key
+- A Google Gemini API key
 
 ## 2. Open in VS Code
 
@@ -54,11 +66,11 @@ cd backend
 npm install
 ```
 
-Copy `.env.example` to `.env` and put your real Anthropic key in it:
+Copy `.env.example` to `.env` and put your real Gemini key in it:
 
 ```env
-ANTHROPIC_API_KEY=your_real_key_here
-ANTHROPIC_MODEL=claude-sonnet-5
+GEMINI_API_KEY=your_real_key_here
+GEMINI_MODEL=gemini-3.6-flash
 PORT=4000
 FRONTEND_ORIGIN=http://localhost:5173
 ```
@@ -110,9 +122,7 @@ Which issue should operations fix first?
 
 ## 5. Why the old version would fail
 
-The uploaded component contains a browser-side function that directly sends requests to `https://api.anthropic.com/v1/messages`. fileciteturn0file0L181-L198
-
-That creates three practical problems:
+A browser-side function that directly sends requests to an AI provider's API creates three practical problems:
 
 1. You need to expose an API credential to frontend code.
 2. Browser CORS/security behavior can interfere with direct API calls.
@@ -121,12 +131,12 @@ That creates three practical problems:
 This version fixes that by making the browser call:
 
 ```text
-React → /api/agent → Express → Anthropic → Express → React
+React → /api/agent → Express → Gemini → Express → React
 ```
 
 ## 6. Better agent behavior
 
-The diagnostic prompt already asks the model to stay grounded in the supplied business statistics and return ranked causes/recommendations. fileciteturn0file0L208-L221
+The diagnostic prompt asks the model to stay grounded in the supplied business statistics and return ranked causes/recommendations.
 
 The backend additionally validates the analysis shape before returning it to the UI. That means a malformed AI response does not silently break the dashboard.
 
@@ -135,12 +145,12 @@ The backend additionally validates the analysis shape before returning it to the
 You can change:
 
 ```env
-ANTHROPIC_MODEL=claude-sonnet-5
+GEMINI_MODEL=gemini-3.6-flash
 ```
 
 without changing the React code.
 
-Anthropic's current documentation describes `claude-sonnet-5` as the newer Sonnet model and documents migration from `claude-sonnet-4-6`. Verify the model available to your API account before switching. citeturn0search0
+Google's documentation lists `gemini-3.6-flash` as part of the current Gemini 3.x Flash line, optimized for multi-step orchestration, coding, and general reasoning. Verify the model available to your API account before switching.
 
 ## 8. Production notes
 
@@ -156,6 +166,6 @@ Before deploying:
 
 ## 9. Important
 
-The dashboard is currently based on deterministic dummy business data. The data-generation logic is in `RCAAgent.jsx`; the supplied source creates four regions and a deliberately injected West-region anomaly so the agent has something meaningful to diagnose. fileciteturn0file0L30-L103
+The dashboard is currently based on deterministic dummy business data. The data-generation logic is in `RCAAgent.jsx`; the supplied source creates four regions and a deliberately injected West-region anomaly so the agent has something meaningful to diagnose.
 
 That is useful for the demo, but it is not yet a real customer-feedback/order-data pipeline. The next step for a production version would be to add CSV/database ingestion and have the backend compute the same statistics from real records.
